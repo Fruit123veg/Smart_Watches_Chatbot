@@ -1,0 +1,8 @@
+streamlit
+pandas
+matplotlib
+openpyxl
+openai
+seaborn
+msal
+requests
