@@ -10,7 +10,7 @@ import json
 from openai import OpenAI
 
 # Page configurations for a modern, professional look
-st.set_page_config(page_title="Titan Analytics Portal", layout="wide")
+st.set_page_config(page_title="Smart_Watches_Chatbot", layout="wide")
 
 DEBUG_MODE = True
 
