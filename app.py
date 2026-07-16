@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import requests
 import json
 from openai import OpenAI
+from datetime import date
 import holidays
 
 # Page configurations for a modern, professional look
@@ -92,43 +93,41 @@ def run_redshift_query(sql_query, api_key):
         return df  
     else:  
         raise Exception(f"Gateway Error {response.status_code}: {response.text}")
+
+india_holidays = holidays.country_holidays('IN', subdiv='KA', years=int(year))
 def get_dynamic_indian_festivals(year):
-    """
-    Dynamically fetches the exact month and details of shifting Indian festivals 
-    for any given year using the 'holidays' library.
-    """
-    # Create the Indian Holiday entity (with subdivisions if needed, e.g., TN, KA, MH)
-    india_holidays = holidays.India(years=year)
-    
-    # Placeholders for our key dynamic festivals
+    # Initialize the dict-like object for India for the specific target year
+    in_holidays = holidays.country_holidays('IN', subdiv='KA', years=year)
+   
+    # Defaults in case a festival is missing in a certain year
     festivals = {
-        "diwali": "October/November (Dynamic calculation pending)",
+        "diwali": "October/November",
         "durga_puja": "October",
         "eid_fitr": "March/April",
         "akshaya_tritiya": "April/May",
         "ugadi": "March/April"
     }
-    
-    # Read through calculated dates to locate exact months
-    for date_obj, name in sorted(india_holidays.items()):
+   
+    # Loop through the dict-like holiday keys and match names
+    for date_obj, name in sorted(in_holidays.items()):
         name_lower = name.lower()
         month_name = date_obj.strftime("%B")
         day_num = date_obj.strftime("%d")
-        
-        if "diwali" in name_lower or "deepavali" in name_lower:
+       
+        if any(term in name_lower for term in ["diwali", "deepavali"]):
             festivals["diwali"] = f"{month_name} (Diwali falls on {month_name} {day_num} in {year})"
-        elif "durga" in name_lower or "dussehra" in name_lower or "vijayadashami" in name_lower:
-            festivals["durga_puja"] = f"{month_name} (Durga Puja / Dussehra falls in {month_name})"
-        elif "ramzan" in name_lower or "id-ul-fitr" in name_lower or "eid" in name_lower:
-            # Capturing the main Eid-ul-Fitr
-            if "adha" not in name_lower:
-                festivals["eid_fitr"] = f"{month_name} (Eid al-Fitr is celebrated in {month_name})"
-        elif "ugadi" in name_lower or "gudi padwa" in name_lower:
-            festivals["ugadi"] = f"{month_name} (Ugadi/Gudi Padwa falls in {month_name})"
+        elif any(term in name_lower for term in ["dussehra", "vijayadashami", "ayudha puja"]):
+            festivals["durga_puja"] = f"{month_name} (Dussehra/Vijayadashami falls on {month_name} {day_num} in {year})"
+        elif any(term in name_lower for term in ["id-ul-fitr", "ramzan", "ramadan"]):
+            if "adha" not in name_lower:  # Excludes Bakrid (Eid al-Adha)
+                festivals["eid_fitr"] = f"{month_name} (Eid al-Fitr/Ramzan is celebrated on {month_name} {day_num} in {year})"
+        elif any(term in name_lower for term in ["ugadi", "gudi padwa"]):
+            festivals["ugadi"] = f"{month_name} (Ugadi falls on {month_name} {day_num} in {year})"
         elif "akshaya" in name_lower:
-            festivals["akshaya_tritiya"] = f"{month_name} (Akshaya Tritiya falls in {month_name})"
-            
+            festivals["akshaya_tritiya"] = f"{month_name} (Akshaya Tritiya falls on {month_name} {day_num} in {year})"
+           
     return festivals
+
 def generate_data_explanation(user_query, df_summary, client_instance):
     """
     Feeds the final processed data back to the LLM to generate 
