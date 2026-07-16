@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import requests
 import json
 from openai import OpenAI
+import holidays
 
 # Page configurations for a modern, professional look
 st.set_page_config(page_title="Smart_Watches_Chatbot", layout="wide")
@@ -91,23 +92,54 @@ def run_redshift_query(sql_query, api_key):
         return df  
     else:  
         raise Exception(f"Gateway Error {response.status_code}: {response.text}")
-
+def get_dynamic_indian_festivals(year):
+    """
+    Dynamically fetches the exact month and details of shifting Indian festivals 
+    for any given year using the 'holidays' library.
+    """
+    # Create the Indian Holiday entity (with subdivisions if needed, e.g., TN, KA, MH)
+    india_holidays = holidays.India(years=year)
+    
+    # Placeholders for our key dynamic festivals
+    festivals = {
+        "diwali": "October/November (Dynamic calculation pending)",
+        "durga_puja": "October",
+        "eid_fitr": "March/April",
+        "akshaya_tritiya": "April/May",
+        "ugadi": "March/April"
+    }
+    
+    # Read through calculated dates to locate exact months
+    for date_obj, name in sorted(india_holidays.items()):
+        name_lower = name.lower()
+        month_name = date_obj.strftime("%B")
+        day_num = date_obj.strftime("%d")
+        
+        if "diwali" in name_lower or "deepavali" in name_lower:
+            festivals["diwali"] = f"{month_name} (Diwali falls on {month_name} {day_num} in {year})"
+        elif "durga" in name_lower or "dussehra" in name_lower or "vijayadashami" in name_lower:
+            festivals["durga_puja"] = f"{month_name} (Durga Puja / Dussehra falls in {month_name})"
+        elif "ramzan" in name_lower or "id-ul-fitr" in name_lower or "eid" in name_lower:
+            # Capturing the main Eid-ul-Fitr
+            if "adha" not in name_lower:
+                festivals["eid_fitr"] = f"{month_name} (Eid al-Fitr is celebrated in {month_name})"
+        elif "ugadi" in name_lower or "gudi padwa" in name_lower:
+            festivals["ugadi"] = f"{month_name} (Ugadi/Gudi Padwa falls in {month_name})"
+        elif "akshaya" in name_lower:
+            festivals["akshaya_tritiya"] = f"{month_name} (Akshaya Tritiya falls in {month_name})"
+            
+    return festivals
 def generate_data_explanation(user_query, df_summary, client_instance):
     """
     Feeds the final processed data back to the LLM to generate 
-    a clean, executive insight summary without technical details or Boolean values and automatically mapping month-wise spikes
-    to major Indian religious and cultural festivals dynamically based on the year.
+    a clean, executive insight summary mapping month-wise spikes
+    to major Indian religious and cultural festivals dynamically computed via the holidays library.
     """
     try:
-        # Clean the dataframe summary to remove any Boolean (True/False) artifacts
         cleaned_df = df_summary.copy()
-        
-        # Drop columns that are completely boolean or named with boolean flags
         cols_to_drop = [col for col in cleaned_df.columns if cleaned_df[col].dtype == 'bool']
         if cols_to_drop:
             cleaned_df = cleaned_df.drop(columns=cols_to_drop)
-            
-        # Convert data frame securely into string representation
         data_string = cleaned_df.to_string()
     except:
         data_string = str(df_summary)
@@ -119,60 +151,30 @@ def generate_data_explanation(user_query, df_summary, client_instance):
             query_year = pd.to_datetime(max_database_date).year
         except:
             pass     
-    for year_candidate in range(2024, 2027):
+    for year_candidate in range(2024, 2030):
         if str(year_candidate) in str(user_query):
             query_year = year_candidate
             break
-    # 2. Dynamic Shifting Festival Calendar Map (2024 to 2030)
-    festival_shifts = {
-        2024: {
-            "diwali": "October/November (Diwali was November 1st)",
-            "durga_puja": "October",
-            "eid_fitr": "April",
-            "akshaya_tritiya": "May",
-            "ugadi": "April"
-        },
-        2025: {
-            "diwali": "October (Diwali is October 20th)",
-            "durga_puja": "October",
-            "eid_fitr": "March",
-            "akshaya_tritiya": "April",
-            "ugadi": "March"
-        },
-        2026: {
-            "diwali": "November (Diwali is November 8th)",
-            "durga_puja": "October",
-            "eid_fitr": "March",
-            "akshaya_tritiya": "May",
-            "ugadi": "March"
-        },
-        2027: {
-            "diwali": "October (Diwali is October 29th)",
-            "durga_puja": "September/October",
-            "eid_fitr": "March",
-            "akshaya_tritiya": "May",
-            "ugadi": "April"
-        }
-    }
 
-     # Fetch the exact shifting months for the target year (fallback to 2026 if not found)
-    shifts = festival_shifts.get(query_year, festival_shifts[2026])
+    # 2. DYNAMICALLY compute shifting festival schedules
+    shifts = get_dynamic_indian_festivals(query_year)
 
     # 3. Build the Context-Aware Festival Guide
     festival_context_guide = f"""
     ### MONTH-WISE INDIAN FESTIVAL REFERENCE GUIDE (FOR THE YEAR {query_year}):
     Use this exact chronological calendar to explain revenue spikes or performance anomalies:
     - January: Pongal, Makar Sankranti, Lohri (Significant gifting/retail surge in South & North India)
-    - February: Eid al-Fitr (if applicable: {shifts['eid_fitr'] if shifts['eid_fitr'] == 'February' else 'None'})
-    - March: Ugadi/Gudi Padwa ({shifts['ugadi'] if 'March' in shifts['ugadi'] else ''}), Eid al-Fitr ({shifts['eid_fitr'] if 'March' in shifts['eid_fitr'] else ''})
-    - April: Ugadi/Gudi Padwa ({shifts['ugadi'] if 'April' in shifts['ugadi'] else ''}), Eid al-Fitr ({shifts['eid_fitr'] if 'April' in shifts['eid_fitr'] else ''}), Akshaya Tritiya ({shifts['akshaya_tritiya'] if 'April' in shifts['akshaya_tritiya'] else ''}) (Highly auspicious gold purchasing)
-    - May: Akshaya Tritiya ({shifts['akshaya_tritiya'] if 'May' in shifts['akshaya_tritiya'] else ''}) (Major gold/jewelry buying period), Wedding season demand
+    - February: Season transitions / Valentine's gifting trends
+    - March: Ugadi/Gudi Padwa ({shifts['ugadi'] if 'March' in shifts['ugadi'] else 'Sometimes in March'}), Eid al-Fitr ({shifts['eid_fitr'] if 'March' in shifts['eid_fitr'] else ''})
+    - April: Ugadi/Gudi Padwa ({shifts['ugadi'] if 'April' in shifts['ugadi'] else ''}), Eid al-Fitr ({shifts['eid_fitr'] if 'April' in shifts['eid_fitr'] else ''}), Akshaya Tritiya ({shifts['akshaya_tritiya'] if 'April' in shifts['akshaya_tritiya'] else ''}) (Highly auspicious gold/watch purchasing)
+    - May: Akshaya Tritiya ({shifts['akshaya_tritiya'] if 'May' in shifts['akshaya_tritiya'] else ''}) (Major watch/jewelry buying period), Wedding season demand
     - June/July: Normal trading months (No major national festival peaks)
-    - August/September: Raksha Bandhan, Onam, Ganesh Chaturthi (Festive build-up)
+    - August/September: Raksha Bandhan, Onam, Ganesh Chaturthi (Festive build-up and gifting)
     - September/October: Durga Puja / Dussehra ({shifts['durga_puja']})
-    - October/November: Dhanteras & Diwali ({shifts['diwali']}) (The absolute peak national purchasing and jewelry buying window of the year)
+    - October/November: Dhanteras & Diwali ({shifts['diwali']}) (The absolute peak national purchasing and watch buying window of the year)
     - December: Christmas, Year-end wedding peak purchases
     """
+    
     # Resolve active month and year to feed context to the AI
     active_month_context = ""
     if max_database_date:
@@ -358,25 +360,23 @@ if user_query:
        `df['month'] = pd.to_datetime(df['month']).dt.strftime('%b %Y')` to prevent metric identification failures during plotting.
     
     STRICT BUSINESS LOGIC, TIME LABELS, & FISCAL PERIOD CALCULATIONS:
-    1. GENERAL REVENUE & SALES BOUNDARY (FISCAL YEAR-TO-DATE DEFAULT): 
-       - If the user query contains general terms like 'sales', 'revenue', 'sales revenue', or asks about performance without specifying a strict month, you MUST default your filter rules to the cumulative CURRENT FISCAL YEAR TO DATE (starting April 1st of the active fiscal year up to the maximum available database date).
-       - This prevents underrepresenting overall performance and aligns with executive reporting standards.
-    2. FULL YEAR OR HISTORICAL YEAR DEFINITION: 
+    1.  FULL YEAR OR HISTORICAL YEAR DEFINITION: 
        - If the query mentions 'full year', 'fiscal year', or specifies a historical year apart from the current active year (e.g., 'sale 2025' or '2024 performance') without explicit MTD boundaries, you MUST assume the custom Indian Fiscal Year layout starting from April of that target context year through March of the consecutive year.
        - Example: For year context 2025, use exact date rules: `date >= '2025-04-01' AND date <= '2026-03-31'`.
-    3. STRICT MONTH-TO-DATE (MTD) DEFAULT TRIGGER:
+    2. STRICT MONTH-TO-DATE (MTD) DEFAULT TRIGGER, SALE AND REVENUE TIME BOUNDARY:
+       - If the user query contains general terms like 'sales', 'revenue', 'sales revenue', or asks about performance without specifying a strict month, you MUST default your filter rules to the CURRENT Month-to-date (MTD context)
        - You MUST only default to a Month-to-Date (MTD) window context if the user query explicitly contains the term 'mtd', 'this month', or refers to a specific current active month name (e.g., 'July sales').
        - MTD WINDOW LOGIC: Must always start from day one of the active month line to the exact matching checkpoint day criteria.
        - Example: For year context {target_year_context}, use exact parameters: `date >= '{target_year_context}-{current_month_str}-01' AND date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
-    4. YTD WINDOW LOGIC: Starts strictly from April 1st of the fiscal target year context (`'{target_year_context}-04-01'`) and matches up perfectly until the identical maximum relative target day threshold is hit: `date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
-    5. FISCAL QUARTER DEFINITIONS WITH IDENTICAL RELATIVE MAX DAY CLIPPING RULES:
+    3. YTD WINDOW LOGIC: Starts strictly from April 1st of the fiscal target year context (`'{target_year_context}-04-01'`) and matches up perfectly until the identical maximum relative target day threshold is hit: `date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
+    4. FISCAL QUARTER DEFINITIONS WITH IDENTICAL RELATIVE MAX DAY CLIPPING RULES:
        - 'Q1' / 'Quarter 1': Range boundary strictly between `'{target_year_context}-04-01'` and `'{target_year_context}-06-30'`. If the active maximum timeline window lands inside this range framework, clip it cleanly using: `date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
        - 'Q2' / 'Quarter 2': Range boundary strictly between `'{target_year_context}-07-01'` and `'{target_year_context}-09-30'`. If the active maximum timeline window lands inside this range framework, clip it cleanly using: `date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
        - 'Q3' / 'Quarter 3': Range boundary strictly between `'{target_year_context}-10-01'` and `'{target_year_context}-12-31'`. If the active maximum timeline window lands inside this range framework, clip it cleanly using: `date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
        - 'Q4' / 'Quarter 4': Range boundary strictly between `'{target_year_context}-01-01'` and `'{target_year_context}-03-31'`. If the active maximum timeline window lands inside this range framework, clip it cleanly using: `date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
-    6. TIMELINE REVENUE RESTRICTIONS: For any baseline relative summaries ('MTD', 'QTD', 'YTD', 'Q1', 'Q2', etc.), strictly aggregate using `retail_revenue` unless custom sale formulas are triggered below.
-    7. DETAILED ROW OVERRIDES (TIMEOUT PREVENTION): If the user query contains 'detail', 'details', 'list', or asks for individual records, do NOT run GROUP BY operations or aggregate SUM functions. Generate a clean SELECT statement choosing key column categories filtering data down using a strict 'LIMIT 100' constraint.
-    8. USER TYPO RESILIENCE: You must expect and automatically correct spelling mistakes or typos in the user query (e.g., treat "tanshiq" as "Tanishq", "fastrak" as "Fastrack", "sles" as "sales"). Always map misspelled inputs to the exact, correct database table columns, values, and chart labels.
+    5. TIMELINE REVENUE RESTRICTIONS: For any baseline relative summaries ('MTD', 'QTD', 'YTD', 'Q1', 'Q2', etc.), strictly aggregate using `retail_revenue` unless custom sale formulas are triggered below.
+    6. DETAILED ROW OVERRIDES (TIMEOUT PREVENTION): If the user query contains 'detail', 'details', 'list', or asks for individual records, do NOT run GROUP BY operations or aggregate SUM functions. Generate a clean SELECT statement choosing key column categories filtering data down using a strict 'LIMIT 100' constraint.
+    7. USER TYPO RESILIENCE: You must expect and automatically correct spelling mistakes or typos in the user query (e.g., treat "tanshiq" as "Tanishq", "fastrak" as "Fastrack", "sles" as "sales"). Always map misspelled inputs to the exact, correct database table columns, values, and chart labels.
     
     STRICT CONTRIBUTION AND GROWTH FORMULA RULES:
     1. CONTRIBUTION FORMULA: If the user asks for "contribution" or "share", calculate it as:
@@ -398,8 +398,8 @@ if user_query:
     - Use:
       service_cust, retail_cust, wdc_cust, others_cust, no_discount_cust, str_cust
     STRICT BUSINESS FORMULA DEFINITIONS:
-    - If user asks for 'Service Sale' or 'Service Sales': You MUST calculate it exactly as: `SUM(service_revenue + str + wdc + others + no_discount)`.
-    - If user asks for 'Building Sale' or 'Building Sales': You MUST calculate it exactly as: `SUM(service_revenue + retail_revenue)`.
+    - If user asks for 'Service Sale' or 'Service Sales': You MUST calculate it exactly as: `sum(service_revenue)+ sum(str) + sum(wdc) + sum(others) + sum(no_discount)`.
+    - If user asks for 'Building Sale' or 'Building Sales': You MUST calculate it exactly as: `sum(service_revenue) + sum(retail_revenue)`.
     STRICT BRAND & ABBREVIATION ISOLATION RULES:
     - HELIOS / Helios -> Match using strict exact uppercase values: `(UPPER(channel) = 'HLS')`.
     - FASTRACK / Fastrack -> Match using strict exact uppercase values: `(UPPER(channel) = 'FTS')`.
