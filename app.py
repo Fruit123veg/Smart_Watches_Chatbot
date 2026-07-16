@@ -95,17 +95,15 @@ def run_redshift_query(sql_query, api_key):
         raise Exception(f"Gateway Error {response.status_code}: {response.text}")
 
 def get_dynamic_indian_festivals(year):
+    """
+    Dynamically fetches the exact month and details of shifting Indian festivals 
+    for any given year using the 'holidays' library.
+    """
     # Initialize the dict-like object for India for the specific target year
     in_holidays = holidays.country_holidays('IN', subdiv='KA', years=int(year))
    
     # Defaults in case a festival is missing in a certain year
-    festivals = {
-        "diwali": "October/November",
-        "durga_puja": "October",
-        "eid_fitr": "March/April",
-        "akshaya_tritiya": "April/May",
-        "ugadi": "March/April"
-    }
+    festivals = {}
    
     # Loop through the dict-like holiday keys and match names
     for date_obj, name in sorted(in_holidays.items()):
