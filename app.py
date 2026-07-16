@@ -103,8 +103,13 @@ def get_dynamic_indian_festivals(year):
     in_holidays = holidays.country_holidays('IN', subdiv='KA', years=int(year))
    
     # Defaults in case a festival is missing in a certain year
-    festivals = {}
-   
+    festivals = {
+        "diwali": "October/November",
+        "durga_puja": "October",
+        "eid_fitr": "March/April",
+        "akshaya_tritiya": "April/May",
+        "ugadi": "March/April"
+    }
     # Loop through the dict-like holiday keys and match names
     for date_obj, name in sorted(in_holidays.items()):
         name_lower = name.lower()
