@@ -6,3 +6,4 @@ openai
 seaborn
 msal
 requests
+holidays 
