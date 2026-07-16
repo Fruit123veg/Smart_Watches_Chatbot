@@ -269,43 +269,45 @@ user_query = st.chat_input("Ask anything about your data... (e.g., Show 2025 MTD
 
 if user_query:
     # ==========================================
-    # 🌟 INSERT THE GATEKEEPER CHECK HERE 🌟
+    # 🌟 NEW TEXT ROUTER FOR GREETINGS & GENERAL QUESTIONS 🌟
     # ==========================================
     classification_prompt = f"""
-    You are a gatekeeper for an enterprise data warehouse chatbot.
-    Classify the following user query: "{user_query}"
+    You are an AI assistant for an enterprise data warehouse chatbot.
+    Analyze the user's query: "{user_query}"
     
-    If the query is a greeting (like 'hi', 'hello'), a casual question ('how are you'), 
-    or completely unrelated to requesting business metrics, sales, or data tables, 
-    respond with exactly: "INVALID".
+    If the query is a greeting (like 'hi', 'hello', 'hey') or a casual/general question (like 'how are you', 'what can you do?'), 
+    respond with a friendly, direct conversational text reply guiding them to ask about data, and start your response with the prefix 'CHAT_REPLY: '.
+    
+    Example response for a greeting: "CHAT_REPLY: Hello! I am your Enterprise Intelligence Engine. How can I help you with your data analytics today?"
     
     Otherwise, if it is a proper question asking for sales, metrics, charts, tables, or trends, 
-    respond with exactly: "VALID".
+    respond with exactly: "PROCEED_TO_DATA".
     """
     
     try:
         class_response = client.chat.completions.create(
             model="gemini-3.1-flash-lite",
             messages=[{"role": "user", "content": classification_prompt}],
-            temperature=0.1
-        ).choices[0].message.content.strip().upper()
+            temperature=0.3
+        ).choices[0].message.content.strip()
     except Exception as e:
-        class_response = "VALID" # Fallback to avoid breaking if the LLM has an error
+        class_response = "PROCEED_TO_DATA" # Fallback to prevent breaking on API errors
         
-    if "INVALID" in class_response:
+    if class_response.startswith("CHAT_REPLY:"):
+        # Strip out the prefix to get just the clean text answer
+        clean_reply = class_response.replace("CHAT_REPLY:", "").strip()
+        
+        # Save it as a regular text breakdown using the explanation modern highlight box style
         st.session_state['interaction_history'].append({  
             'query': user_query,  
-            'output_type': 'ERROR',  
-            'table_df': None,  
+            'output_type': 'TABLE', # Triggers the layout structure without throwing chart logic
+            'table_df': None,       # Leaves data visualization completely blank
             'img_path': None,  
             'generated_sql': None,
-            'is_error': True,  
-            'error_msg': "⚠️ Data not found / Improper query. Please ask a proper data analytics question about Titan.",  
-            'traceback': "",
-            'explanation': None
+            'explanation': clean_reply # Puts your friendly chat reply in the modern highlight box
         })
         st.rerun()
-        
+
     active_sql = None
     try:
         max_date_df = run_redshift_query("SELECT MAX(date) as max_date FROM sem_pu_wtch.mv_tgt_wtch_etp_mendix_cs_metrics_bi_storewise", redshift_api_key)
