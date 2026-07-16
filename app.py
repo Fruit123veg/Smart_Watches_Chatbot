@@ -358,9 +358,15 @@ if user_query:
     1. MONTHLY TRENDS: When the user asks for month-on-month trends or monthly details, always use `DATE_TRUNC('month', date) AS month` or `DATE_TRUNC('month', date)::date AS month` in the SQL query.
     2. PANDAS MONTH CONVERSION: In the generated Python snippet, explicitly cast the `'month'` column using:
        `df['month'] = pd.to_datetime(df['month']).dt.strftime('%b %Y')` to prevent metric identification failures during plotting.
-    
-    STRICT BUSINESS LOGIC, TIME LABELS, & FISCAL PERIOD CALCULATIONS:
-    1.  FULL YEAR OR HISTORICAL YEAR DEFINITION: 
+
+    1. STRICT BUSINESS LOGIC, TIME LABELS, & FISCAL PERIOD CALCULATIONS:
+       1. STRICT TIME BOUNDARY HIERARCHY (APPLIES TO REGION-WISE, CHANNEL-WISE, STORE-WISE, OR BRAND-WISE GROUPS):
+       - RULE A (MTD MANDATORY FOR ALL SALES/REVENUE): If the query is about "sales" or "revenue" (including regional views, e.g., "region wise sales" or "revenue by region"), you MUST default strictly to the Month-to-Date (MTD) window. Do NOT use Fiscal Year-to-Date (FYTD) for these requests.
+         * MTD SQL filter limit: `date >= '{target_year_context}-{current_month_str}-01' AND date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
+       - RULE B (FYTD FOR CONTRIBUTION AND GROWTH ONLY): You MUST ONLY use the Fiscal Year-to-Date (FYTD) time frame if the user explicitly asks for "contribution", "share", "growth", or "YoY".
+         * FYTD SQL filter limit: `date >= '{target_year_context}-04-01' AND date <= '{target_year_context}-{current_month_str}-{current_day_str}'`.
+       - RULE C: The custom mathematical logic for "Service Sale" and "Building Sale" bypasses both Rules A and B and must strictly use its custom column calculation formula.
+       2.  FULL YEAR OR HISTORICAL YEAR DEFINITION: 
        - If the query mentions 'full year', 'fiscal year', or specifies a historical year apart from the current active year (e.g., 'sale 2025' or '2024 performance') without explicit MTD boundaries, you MUST assume the custom Indian Fiscal Year layout starting from April of that target context year through March of the consecutive year.
        - Example: For year context 2025, use exact date rules: `date >= '2025-04-01' AND date <= '2026-03-31'`.
     2. STRICT MONTH-TO-DATE (MTD) DEFAULT TRIGGER, SALE AND REVENUE TIME BOUNDARY:
@@ -388,10 +394,10 @@ if user_query:
     - "Last Year" refers to the exact matching corresponding period of the previous fiscal year.
     - Always evaluate both periods on the same fiscal timeline baseline to maintain analytical consistency.
     3.CONTRIBUTION & GROWTH FORMATTING REQUIREMENT: Any contribution, market share, or growth metrics MUST be calculated as percentages. When plotting, the text labels on top of bars must append a '%' sign suffix.
-    TITLE RULE:
-    - Only mention MTD/QTD/YTD in the chart title if the query is for the current active period.
-    - If the query is for a past/future year or a non-current month, use a neutral chart title without MTD/QTD/YTD.
-    
+    STRICT FORMATTING RULES:
+    1. HISTORICAL FORMATTING RULE: If user query specifies a past/future year(e.g.,'2025','2024') or past/future month (e.g., 'may2025','jan 2025'), you MUST NOT INCLUDE 'MTD', 'QTD', 'YTD', 'Month-to-date' or ' Year-to-date' in the chart tittle ubder any circumstances.
+    - for example,if query is sales "sales 2025" or "mtd 2025", the tittle MUST ve formatted simple as " Revenue 2025" or "Sales 2025".
+    2. CURRENT ACTIVE PERUOD ONLY: You may only include terms like 'MTD', 'QTD', 'YTD' in the chart title if the requestis strictly for current active month and year context(i.e., '{max_database_date}').
     CUSTOMER COLUMN MAPPING RULE:
     - The dataset does not contain a column named customer.
     - Any customer-related query must map to the correct `*_cust` field.
