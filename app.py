@@ -94,10 +94,9 @@ def run_redshift_query(sql_query, api_key):
     else:  
         raise Exception(f"Gateway Error {response.status_code}: {response.text}")
 
-india_holidays = holidays.country_holidays('IN', subdiv='KA', years=int(year))
 def get_dynamic_indian_festivals(year):
     # Initialize the dict-like object for India for the specific target year
-    in_holidays = holidays.country_holidays('IN', subdiv='KA', years=year)
+    in_holidays = holidays.country_holidays('IN', subdiv='KA', years=int(year))
    
     # Defaults in case a festival is missing in a certain year
     festivals = {
