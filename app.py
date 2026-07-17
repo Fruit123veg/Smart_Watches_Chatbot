@@ -257,11 +257,11 @@ for interaction in st.session_state['interaction_history']:
         chart_path = interaction.get('img_path')
         table_df = interaction.get('table_df')
         explanation_text = interaction.get('explanation', "")
-
+        
         # -------------------------------------------------------------
         # CASE A: It's a normal conversation (Greeting or casual chat)
         # -------------------------------------------------------------
-        if not sql_query and not chart_path and table_df is None:
+        if interaction['output_type'] == 'CHAT' or (not sql_query and not chart_path and table_df is None):
             st.write(explanation_text)
 
         # -------------------------------------------------------------
@@ -272,24 +272,18 @@ for interaction in st.session_state['interaction_history']:
             if sql_query:
                 with st.expander("📄 View Generated SQL Query", expanded=False):  
                     st.code(sql_query, language="sql")  
-               
-        if interaction.get('is_error'):
-            st.error(f"⚠️ Error details: {interaction.get('error_msg')}")
-            with st.expander("🔍 Click to view Traceback Context"):
-                st.code(interaction.get('traceback'), language="python")
-        else:
-            if interaction['output_type'] == "TABLE":  
-                if interaction['table_df'] is not None:  
-                    st.dataframe(interaction['table_df'], use_container_width=True)  
-            else:  
-                img_path = interaction['img_path']  
-                if img_path and os.path.exists(img_path):  
-                    st.image(img_path, width=400)
-           
-            # Display Modern Highlight Box for generated Business Insights
-            if interaction.get('explanation'):
+            
+            # 2. Render visual layouts depending on data structure types
+            if interaction['output_type'] == "TABLE" and table_df is not None:
+                st.dataframe(table_df, use_container_width=True)
+            elif chart_path and os.path.exists(chart_path):
+                st.image(chart_path, width=400)
+            
+            # 3. Render the formal Highlight Box Card only for true analytical data results
+            if explanation_text:
                 st.markdown("### 📊 Explanation")
-                st.info(interaction['explanation'])
+                st.info(explanation_text)
+                
 
 # --- CHATBOT CHAT INPUT INTERFACE AT BOTTOM ---
 user_query = st.chat_input("Ask anything about your data... (e.g., Show 2025 MTD sales)")
@@ -327,13 +321,14 @@ if user_query:
         # Save it as a regular text breakdown using the explanation modern highlight box style
         st.session_state['interaction_history'].append({  
             'query': user_query,  
-            'output_type': 'TABLE', # Triggers the layout structure without throwing chart logic
-            'table_df': None,       # Leaves data visualization completely blank
+            'output_type': 'CHAT',  # Change this from 'TABLE' to 'CHAT'
+            'table_df': None,       
             'img_path': None,  
             'generated_sql': None,
-            'explanation': clean_reply # Puts your friendly chat reply in the modern highlight box
+            'explanation': clean_reply 
         })
         st.rerun()
+
 
     active_sql = None
     try:
