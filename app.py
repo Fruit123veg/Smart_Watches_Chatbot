@@ -245,10 +245,34 @@ for interaction in st.session_state['interaction_history']:
                  
     # Assistant Response  
     with st.chat_message("assistant"):  
-        if interaction.get('generated_sql'):  
-            with st.expander("📄 View Generated SQL Query", expanded=False):  
-                st.code(interaction['generated_sql'], language="sql")  
-                     
+        # Handle strict error items first
+        if interaction.get('is_error'):
+            st.error(f"⚠️ Error details: {interaction.get('error_msg')}")
+            with st.expander("🔍 Click to view Traceback Context"):
+                st.code(interaction.get('traceback'), language="python")
+            continue
+            
+        # Map variables to your specific interaction key structures
+        sql_query = interaction.get('generated_sql')
+        chart_path = interaction.get('img_path')
+        table_df = interaction.get('table_df')
+        explanation_text = interaction.get('explanation', "")
+
+        # -------------------------------------------------------------
+        # CASE A: It's a normal conversation (Greeting or casual chat)
+        # -------------------------------------------------------------
+        if not sql_query and not chart_path and table_df is None:
+            st.write(explanation_text)
+
+        # -------------------------------------------------------------
+        # CASE B: It's a structured data query result
+        # -------------------------------------------------------------
+        else:
+            # 1. Show SQL expander if query exists
+            if sql_query:
+                with st.expander("📄 View Generated SQL Query", expanded=False):  
+                    st.code(sql_query, language="sql")  
+               
         if interaction.get('is_error'):
             st.error(f"⚠️ Error details: {interaction.get('error_msg')}")
             with st.expander("🔍 Click to view Traceback Context"):
